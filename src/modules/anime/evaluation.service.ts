@@ -1,55 +1,39 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Evaluation } from './entities/evaluation.entity';
 import { CreateEvaluationDto } from './dto/create-evaluation.dto';
-import { Anime } from './entities/anime.entity';
 
 @Injectable()
 export class EvaluationService {
   constructor(
     @InjectRepository(Evaluation)
     private readonly evaluationRepo: Repository<Evaluation>,
-    @InjectRepository(Anime)
-    private readonly animeRepo: Repository<Anime>,
   ) {}
 
-  async rateAnime(dto: CreateEvaluationDto, userId: number) {
-    const anime = await this.animeRepo.findOneBy({ id: dto.animeId });
-    if (!anime) throw new NotFoundException('Anime não encontrado');
-
-    // Verifica se o usuário já avaliou antes
-    const existingEvaluation = await this.evaluationRepo.findOne({
-      where: {
-        anime: { id: dto.animeId },
-        user: { id: userId } as any,
-      },
+  async create(createEvaluationDto: CreateEvaluationDto, userId: number) {
+    const evaluation = this.evaluationRepo.create({
+      nota: createEvaluationDto.nota,
+      animeId: createEvaluationDto.animeId, // Salva o ID do MAL direto
+      user: { id: userId } as any, // Vincula o ID do usuário logado
     });
 
-    if (existingEvaluation) {
-      // Atualiza a avaliação existente
-      existingEvaluation.rating = dto.rating;
-      return await this.evaluationRepo.save(existingEvaluation);
-    } else {
-      // Cria uma nova avaliação
-      const evaluation = this.evaluationRepo.create({
-        rating: dto.rating,
-        anime: anime,
-        user: { id: userId } as any, // Vincula o ID do usuário logado
-      });
-      return await this.evaluationRepo.save(evaluation);
-    }
+    return await this.evaluationRepo.save(evaluation);
   }
 
-  // Método para calcular a média
-  async getAnimeAverage(animeId: number): Promise<number> {
-    const { average } = await this.evaluationRepo
-      .createQueryBuilder('eval')
-      .select('AVG(eval.rating)', 'average')
-      .where('eval.animeId = :animeId', { animeId })
-      .getRawOne();
+  // Busca a média e todas as avaliações de um anime específico do MAL
+  async findByAnime(animeId: number) {
+    const avaliacoes = await this.evaluationRepo.find({
+      where: { animeId: animeId },
+      relations: ['user'],
+      order: { data_criacao: 'DESC' },
+    });
 
-    // Retorna a média formatada (opcional: ou null se não houver notas)
-    return parseFloat(average) || 0;
+    // Bônus: Já calcula a média das notas para você mandar pro frontend!
+    const media = avaliacoes.length > 0 
+      ? avaliacoes.reduce((acc, aval) => acc + aval.nota, 0) / avaliacoes.length 
+      : 0;
+
+    return { media: media.toFixed(2), total_avaliacoes: avaliacoes.length, avaliacoes };
   }
 }

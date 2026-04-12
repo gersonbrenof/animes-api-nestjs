@@ -12,13 +12,13 @@ export class CreateEvaluationDto {
   @Min(0)
   @Max(10)
   @IsNotEmpty()
-  rating: number;
+  nota!: number;
 
   @ApiProperty({
-    description: 'ID do anime que está sendo avaliado',
-    example: 1,
+    description: 'ID do anime que está sendo avaliado no MyAnimeList',
+    example: 16498,
   })
-  @IsNumber() // Recomendado: use @IsInt() se o ID for sempre inteiro
+  @IsInt() 
   @IsNotEmpty()
-  animeId: number;
+  animeId!: number;
 }

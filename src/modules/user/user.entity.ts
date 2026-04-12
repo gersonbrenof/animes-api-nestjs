@@ -1,5 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Comment } from '../anime/entities/comment.entity'; // Ajuste o caminho se necessário
+import { Evaluation } from '../anime/entities/evaluation.entity'; // Ajuste o caminho se necessário
 
+// Se você não tiver o Enum no arquivo, certifique-se de mantê-lo
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
@@ -8,17 +11,26 @@ export enum UserRole {
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
+
+  // 👇 Nova coluna de NOME adicionada
+  @Column()
+  nome!: string; 
 
   @Column({ unique: true })
-  email: string;
+  email!: string;
 
   @Column()
-  password: string;
+  password!: string;
 
-  // 🔹 ALTERAÇÃO: SQLite não suporta enum, usamos string
+  // SQLite não suporta enum nativamente, usamos text
   @Column({ type: 'text', default: UserRole.USER })
-  role: UserRole;
-  evaluations: any;
-    comments: any;
+  role!: UserRole;
+
+  // 👇 Trocamos o 'any' pelas relações reais com os Comentários e Avaliações
+  @OneToMany(() => Evaluation, (evaluation) => evaluation.user)
+  evaluations!: Evaluation[];
+
+  @OneToMany(() => Comment, (comment) => comment.user)
+  comments!: Comment[];
 }

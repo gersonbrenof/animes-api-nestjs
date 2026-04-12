@@ -1,20 +1,14 @@
-import { IsString, IsNotEmpty, IsNumber, IsInt } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCommentDto {
-  @ApiProperty({
-    description: 'Conteúdo do comentário',
-    example: 'Anime muito bom, a animação é incrível!',
-  })
+  @ApiProperty({ description: 'O ID do anime lá no MyAnimeList', example: 34572 })
+  @IsNumber()
+  @IsNotEmpty()
+  animeId!: number;
+
+  @ApiProperty({ description: 'Texto do comentário', example: 'Achei esse anime incrível!' })
   @IsString()
   @IsNotEmpty()
-  content: string;
-
-  @ApiProperty({
-    description: 'ID do anime onde o comentário será feito',
-    example: 1,
-  })
-  @IsInt()
-  @IsNotEmpty()
-  animeId: number;
+  content!: string;
 }

@@ -1,151 +1,55 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Patch,
-  Delete,
-  Param,
-  Body,
-  UseGuards,
-  UploadedFile,
-  UseInterceptors,
-  Query,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { Multer } from 'multer'; // 🔹 IMPORTAR O TIPO DIRETO DE MULTER
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-
+import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { AnimeService } from './anime.service';
-import { CreateAnimeDto } from './dto/create-anime.dto';
-import { UpdateAnimeDto } from './dto/update-anime.dto';
-
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('Anime')
-@ApiBearerAuth()
 @Controller('anime')
 export class AnimeController {
-  constructor(private readonly animeService: AnimeService) {}
+  constructor(private readonly animeService: AnimeService) { }
 
-  // 🔹 Criar anime (apenas admin) com upload de imagem
-  @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @UseInterceptors(FileInterceptor('foto'))
-  @ApiOperation({ summary: 'Criar novo anime (somente admin)' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    description: 'Cadastro de anime com foto',
-    schema: {
-      type: 'object',
-      properties: {
-        titulo: { type: 'string', example: 'Naruto' },
-        descricao: { type: 'string', example: 'Anime de ninjas' },
-        genero: { type: 'string', example: 'Ação' },
-        foto: { type: 'string', format: 'binary' },
-        data_lancamento: { type: 'number', example: 2002 },
-      },
-      required: ['titulo', 'descricao', 'genero'],
-    },
-  })
-  create(@Body() createAnimeDto: CreateAnimeDto, @UploadedFile() foto?: Multer.File) {
-    if (foto) {
-      createAnimeDto.foto = `uploads/${foto.originalname}`; // 🔹 agora correto
-    }
-    return this.animeService.create(createAnimeDto);
+  @Get('ranking')
+  @ApiOperation({ summary: 'Listar recomendações do MyAnimeList' })
+  @ApiQuery({ name: 'type', required: false, example: 'bypopularity' })
+  async getRanking(@Query('type') type?: string) {
+    return this.animeService.getMalRanking(type || 'all');
   }
 
-  // 🔹 Atualizar anime (apenas admin) com upload
-  @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @UseInterceptors(FileInterceptor('foto'))
-  @ApiOperation({ summary: 'Atualizar anime (somente admin)' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    description: 'Atualização de anime (pode incluir nova foto)',
-    schema: {
-      type: 'object',
-      properties: {
-        titulo: { type: 'string', example: 'Naruto' },
-        descricao: { type: 'string', example: 'Anime de ninjas' },
-        genero: { type: 'string', example: 'Ação' },
-        foto: { type: 'string', format: 'binary' },
-        data_lancamento: { type: 'number', example: 2002 },
-      },
-    },
-  })
-  update(
-    @Param('id') id: number,
-    @Body() updateAnimeDto: UpdateAnimeDto,
-    @UploadedFile() foto?: Multer.File,
-  ) {
-    if (foto) {
-      updateAnimeDto.foto = `uploads/${foto.originalname}`;
-    }
-    return this.animeService.update(id, updateAnimeDto);
-  }
-// 🔹 Atualização Parcial (PATCH) - Apenas Admin
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @UseInterceptors(FileInterceptor('foto'))
-  @ApiOperation({ summary: 'Atualizar parcialmente um anime (somente admin)' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    description: 'Envie apenas os campos que deseja alterar (título, descrição, foto, etc.)',
-    schema: {
-      type: 'object',
-      properties: {
-        titulo: { type: 'string', nullable: true },
-        descricao: { type: 'string', nullable: true },
-        genero: { type: 'string', nullable: true },
-        foto: { type: 'string', format: 'binary', nullable: true },
-      },
-    },
-  })
-  updatePartial(
-    @Param('id') id: number,
-    @Body() updateAnimeDto: UpdateAnimeDto,
-    @UploadedFile() foto?: Multer.File,
-  ) {
-    // A lógica é a mesma: se veio foto nova, atualiza o caminho.
-    // Se não veio foto, o service mantém a antiga (se o DTO estiver vazio nesse campo).
-    if (foto) {
-      updateAnimeDto.foto = `uploads/${foto.originalname}`;
-    }
-    
-    return this.animeService.update(id, updateAnimeDto);
-  }
-  // 🔹 Listar todos os animes
-@Get()
-  @ApiOperation({ summary: 'Listar animes (filtro opcional por título ou gênero)' })
-  @ApiQuery({ name: 'titulo', required: false, description: 'Filtrar por nome do anime' })
-  @ApiQuery({ name: 'genero', required: false, description: 'Filtrar por categoria/gênero' })
-  findAll(
-    @Query('titulo') titulo?: string,
-    @Query('genero') genero?: string,
-  ) {
-    return this.animeService.findAll(titulo, genero);
+  @Get('search')
+  @ApiOperation({ summary: 'Pesquisar animes no MyAnimeList' })
+  @ApiQuery({ name: 'titulo', required: true })
+  async search(@Query('titulo') titulo: string) {
+    return this.animeService.fetchMALData(titulo);
   }
 
-  // 🔹 Buscar anime por ID
+  // 👇 NOVA ROTA: Filtro por Categoria/Gênero
+  @Get('categoria')
+  @ApiOperation({ summary: 'Listar os melhores animes por categoria/gênero' })
+  @ApiQuery({
+    name: 'genre',
+    required: true,
+    example: 'Romance',
+    description: 'Nome do gênero em inglês (Ex: Action, Romance, Comedy, Drama, Isekai)'
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: 10,
+    description: 'Quantidade de animes a retornar (Padrão: 10)'
+  })
+  async getPorCategoria(
+    @Query('genre') genre: string,
+    @Query('limit') limit?: number, // O Swagger/NestJS às vezes passa como string, então faremos o cast seguro no service, mas aqui tipamos como number
+  ) {
+    // Passamos o limite garantindo que seja um número (caso a query venha como string) e com fallback para 10
+    const limiteFormatado = limit ? Number(limit) : 10;
+    return this.animeService.getTopAnimesByCategory(genre, limiteFormatado);
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Buscar anime pelo ID' })
-  @ApiResponse({ status: 200, description: 'Anime retornado com sucesso' })
-  findOne(@Param('id') id: number) {
-    return this.animeService.findOne(id);
+  @ApiOperation({ summary: 'Buscar detalhes de um anime específico pelo ID' })
+  @ApiParam({ name: 'id', required: true, example: 5114, description: 'ID do anime no MyAnimeList' })
+  async getById(@Param('id', ParseIntPipe) id: number) {
+    return this.animeService.getAnimeById(id);
   }
 
-  // 🔹 Deletar anime (apenas admin)
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @ApiOperation({ summary: 'Deletar anime (somente admin)' })
-  remove(@Param('id') id: number) {
-    return this.animeService.remove(id);
-  }
 }

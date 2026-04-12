@@ -1,21 +1,21 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
-import { Anime } from './anime.entity';
-import { User } from '../../user/user.entity'; // Ajuste o import do User
+import { User } from '../../user/user.entity'; // Verifique se o caminho do User está correto
 
-@Entity('comment')
+@Entity('comments')
 export class Comment {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
 
   @Column({ type: 'text' })
-  content: string;
+  content!: string;
 
-  @CreateDateColumn({ name: 'data_criacao' })
-  data_criacao: Date;
-
-  @ManyToOne(() => Anime, (anime) => anime.comments, { onDelete: 'CASCADE' })
-  anime: Anime;
+  // 👇 Agora isso é apenas um número guardando o ID do MyAnimeList!
+  @Column({ type: 'int' })
+  animeId!: number; 
 
   @ManyToOne(() => User, (user) => user.comments)
-  user: User;
+  user!: User;
+
+  @CreateDateColumn()
+  data_criacao!: Date;
 }

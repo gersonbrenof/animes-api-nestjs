@@ -11,13 +11,15 @@ export class UserService {
     private userRepository: Repository<User>,
   ) {}
 
-  async createUser(email: string, password: string, role = UserRole.USER) {
+  // 👇 1. Adicione o 'nome' aqui como o primeiro parâmetro
+  async createUser(nome: string, email: string, password: string, role = UserRole.USER) {
     const exists = await this.userRepository.findOne({ where: { email } });
     if (exists) throw new BadRequestException('Usuário já existe');
 
     const hash = await bcrypt.hash(password, 10);
 
     const user = this.userRepository.create({
+      nome, // 👇 2. Adicione o 'nome' aqui para salvar no banco
       email,
       password: hash,
       role,
@@ -26,7 +28,6 @@ export class UserService {
     return this.userRepository.save(user);
   }
 
-  // 🔹 Corrigido para number
   async findById(id: number) {
     return this.userRepository.findOne({ where: { id } });
   }

@@ -34,11 +34,12 @@ export class AuthService {
     }
     async register(dto: CreateUserDto) {
         try {
-            const user = await this.userService.createUser(dto.email, dto.password);
+            const user = await this.userService.createUser(dto.nome, dto.email, dto.password);
             const { password, ...result } = user; // 🔹 remove a senha antes de retornar
             return result;
         } catch (error) {
-            throw new BadRequestException(error.message);
+            const message = error instanceof Error ? error.message : 'An unknown error occurred';
+            throw new BadRequestException(message);
         }
     }
 }
