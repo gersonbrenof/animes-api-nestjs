@@ -1,25 +1,66 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get, Req, UseGuards, Res } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import type { Response } from 'express';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
-
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService, 
+  ) {}
+@Get('me')
+@UseGuards(AuthGuard('jwt')) // Garante que o usuário esteja logado
+async getMe(@Req() req) {
+  return req.user; // O Passport injeta o usuário aqui
+}
   @Post('register')
-  @ApiOperation({ summary: 'Registra um novo usuário' })
-  @ApiResponse({ status: 201, description: 'Usuário criado com sucesso.' })
   async register(@Body() createUserDto: CreateUserDto) {
     return this.authService.register(createUserDto);
   }
 
-  @Post('login')
-  @ApiOperation({ summary: 'Faz login e retorna JWT' })
-  @ApiResponse({ status: 200, description: 'Login realizado com sucesso.' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.email, loginDto.password);
+@Post('login')
+  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const { access_token, user } = await this.authService.login(loginDto.email, loginDto.password);
+    
+    // 1. Define o token no cookie (segurança)
+    this.setAuthCookie(res, access_token);
+    
+    // 2. Retorna o token e o usuário no JSON (para o seu Frontend usar)
+    return { 
+      access_token, // ✅ Adicione o token aqui
+      user 
+    };
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {}
+
+@Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req, @Res() res: Response) {
+    const authData = await this.authService.validateGoogleUser(req.user);
+    
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    
+    // 🟢 Em vez de injetar o cookie aqui, mandamos o token na URL para o Front gerenciar
+    return res.redirect(`${frontendUrl}?token=${authData.access_token}`);
+  }
+
+  // MÉTODO AUXILIAR PRIVADO DE SEGURANÇA
+  private setAuthCookie(res: Response, token: string) {
+    res.cookie('access_token', token, {
+      httpOnly: true, // Protege contra XSS
+      secure: process.env.NODE_ENV === 'production', // Só HTTPS em prod
+      sameSite: 'lax', // Protege contra CSRF
+      maxAge: 3600000 * 24, // 24 horas
+      path: '/'
+    });
   }
 }

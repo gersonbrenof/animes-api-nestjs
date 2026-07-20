@@ -13,7 +13,7 @@ export class User {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  // 👇 Nova coluna de NOME adicionada
+  // Nova coluna de NOME adicionada
   @Column()
   nome!: string; 
 
@@ -27,10 +27,13 @@ export class User {
   @Column({ type: 'text', default: UserRole.USER })
   role!: UserRole;
 
-  // 👇 Trocamos o 'any' pelas relações reais com os Comentários e Avaliações
+  // Trocamos o 'any' pelas relações reais com os Comentários e Avaliações
   @OneToMany(() => Evaluation, (evaluation) => evaluation.user)
   evaluations!: Evaluation[];
 
   @OneToMany(() => Comment, (comment) => comment.user)
   comments!: Comment[];
+
+  @Column({ nullable: true })
+  foto?: string;
 }

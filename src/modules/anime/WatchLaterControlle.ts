@@ -1,12 +1,12 @@
 import { Controller, Get, Post, Delete, Param, ParseIntPipe, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
-import type { Request } from 'express'; // 👈 A mágica acontece adicionando o 'type' aqui
+import type { Request } from 'express'; 
 import { WatchLaterService } from './watch-later.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // (Ajuste o caminho para o seu guard)
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'; 
 
 @ApiTags('Watch Later')
 @ApiBearerAuth() 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard) // Protege todas as rotas deste controller
 @Controller('watch-later')
 export class WatchLaterController {
     constructor(private readonly watchLaterService: WatchLaterService) { }
@@ -36,6 +36,14 @@ export class WatchLaterController {
     async findAll(@Req() req: Request) {
         const userId = this.getUserId(req);
         return this.watchLaterService.getWatchList(userId);
+    }
+
+    // NOVA ROTA: Obter recomendações via IA
+    @Get('recommendations')
+    @ApiOperation({ summary: 'Obter recomendações de animes via IA baseadas na lista' })
+    async getRecommendations(@Req() req: Request) {
+        const userId = this.getUserId(req);
+        return this.watchLaterService.getRecommendations(userId);
     }
 
     @Delete(':id')

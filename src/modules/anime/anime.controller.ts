@@ -8,27 +8,48 @@ export class AnimeController {
   constructor(private readonly animeService: AnimeService) { }
 
   @Get('ranking')
-  @ApiOperation({ summary: 'Listar recomendações do MyAnimeList' })
-  @ApiQuery({ name: 'type', required: false, example: 'bypopularity' })
-  async getRanking(@Query('type') type?: string) {
-    return this.animeService.getMalRanking(type || 'all');
+  @ApiOperation({ summary: 'Listar recomendações do MyAnimeList com paginação' })
+  @ApiQuery({ name: 'type', required: false, example: 'all', description: 'Filtro de ranking (Ex: all, bypopularity, airing)' })
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Número da página (Padrão: 1)' })
+  @ApiQuery({ name: 'limit', required: false, example: 10, description: 'Quantidade de itens por página (Padrão: 10)' })
+  async getRanking(
+    @Query('type') type?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const paginaFormatada = page ? Number(page) : 1;
+    const limiteFormatado = limit ? Number(limit) : 10;
+    return this.animeService.getMalRanking(type || 'all', paginaFormatada, limiteFormatado);
   }
 
   @Get('search')
-  @ApiOperation({ summary: 'Pesquisar animes no MyAnimeList' })
+  @ApiOperation({ summary: 'Pesquisar animes no MyAnimeList com paginação' })
   @ApiQuery({ name: 'titulo', required: true })
-  async search(@Query('titulo') titulo: string) {
-    return this.animeService.fetchMALData(titulo);
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Número da página (Padrão: 1)' })
+  @ApiQuery({ name: 'limit', required: false, example: 10, description: 'Quantidade de itens por página (Padrão: 10)' })
+  async search(
+    @Query('titulo') titulo: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const paginaFormatada = page ? Number(page) : 1;
+    const limiteFormatado = limit ? Number(limit) : 10;
+    return this.animeService.fetchMALData(titulo, paginaFormatada, limiteFormatado);
   }
 
-  // 👇 NOVA ROTA: Filtro por Categoria/Gênero
   @Get('categoria')
-  @ApiOperation({ summary: 'Listar os melhores animes por categoria/gênero' })
+  @ApiOperation({ summary: 'Listar os melhores animes por categoria/gênero com paginação' })
   @ApiQuery({
     name: 'genre',
     required: true,
     example: 'Romance',
     description: 'Nome do gênero em inglês (Ex: Action, Romance, Comedy, Drama, Isekai)'
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    example: 1,
+    description: 'Número da página (Padrão: 1)'
   })
   @ApiQuery({
     name: 'limit',
@@ -38,11 +59,30 @@ export class AnimeController {
   })
   async getPorCategoria(
     @Query('genre') genre: string,
-    @Query('limit') limit?: number, // O Swagger/NestJS às vezes passa como string, então faremos o cast seguro no service, mas aqui tipamos como number
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    // Passamos o limite garantindo que seja um número (caso a query venha como string) e com fallback para 10
+    const paginaFormatada = page ? Number(page) : 1;
     const limiteFormatado = limit ? Number(limit) : 10;
-    return this.animeService.getTopAnimesByCategory(genre, limiteFormatado);
+    return this.animeService.getTopAnimesByCategory(genre, paginaFormatada, limiteFormatado);
+  }
+
+  //  NOVA ROTA: Busca de animes por temporada e ano com paginação
+  @Get('temporada/:ano/:season')
+  @ApiOperation({ summary: 'Buscar animes por ano e temporada com paginação' })
+  @ApiParam({ name: 'ano', required: true, example: 2024, description: 'Ano da temporada (ex: 2024)' })
+  @ApiParam({ name: 'season', required: true, example: 'verao', description: 'Temporada (ex: inverno, primavera, verao, outono ou termos em inglês)' })
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Número da página (Padrão: 1)' })
+  @ApiQuery({ name: 'limit', required: false, example: 10, description: 'Quantidade de itens por página (Padrão: 10)' })
+  async getTemporada(
+    @Param('ano', ParseIntPipe) ano: number,
+    @Param('season') season: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const paginaFormatada = page ? Number(page) : 1;
+    const limiteFormatado = limit ? Number(limit) : 10;
+    return this.animeService.getSeasonalAnime(ano, season, paginaFormatada, limiteFormatado);
   }
 
   @Get(':id')
@@ -51,5 +91,4 @@ export class AnimeController {
   async getById(@Param('id', ParseIntPipe) id: number) {
     return this.animeService.getAnimeById(id);
   }
-
 }
