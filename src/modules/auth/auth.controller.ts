@@ -46,22 +46,33 @@ async getMe(@Req() req) {
 @UseGuards(AuthGuard('google'))
 async googleAuthRedirect(@Req() req, @Res() res: Response) {
   const authData = await this.authService.validateGoogleUser(req.user);
-  
+
   this.setAuthCookie(res, authData.access_token);
 
-  const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-  
-  // 🟢 Redireciona para a rota do Callback no React enviando o token
-  return res.redirect(`${frontendUrl}/auth/callback?token=${authData.access_token}`);
+  // 🔹 Pega a URL padrão do .env
+  const defaultFrontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+
+  // 🔹 Detecta de onde o usuário veio
+  const referer = req.headers.referer || req.headers.origin || '';
+  const isLocalhost = referer.includes('localhost') || referer.includes('127.0.0.1');
+
+  // 🔹 Se a chamada veio do ambiente local, redireciona para o localhost; senão, vai para a produção
+  const targetFrontendUrl = isLocalhost ? 'http://localhost:5173' : defaultFrontendUrl;
+
+  // 🟢 Redireciona para o frontend correto enviando o token
+  return res.redirect(`${targetFrontendUrl}/auth/callback?token=${authData.access_token}`);
 }
-  // MÉTODO AUXILIAR PRIVADO DE SEGURANÇA
-  private setAuthCookie(res: Response, token: string) {
-    res.cookie('access_token', token, {
-      httpOnly: true, // Protege contra XSS
-      secure: process.env.NODE_ENV === 'production', // Só HTTPS em prod
-      sameSite: 'lax', // Protege contra CSRF
-      maxAge: 3600000 * 24, // 24 horas
-      path: '/'
-    });
-  }
+
+// MÉTODO AUXILIAR PRIVADO DE SEGURANÇA
+private setAuthCookie(res: Response, token: string) {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  res.cookie('access_token', token, {
+    httpOnly: true, // Protege contra XSS
+    secure: isProduction, // HTTPS em produção
+    sameSite: isProduction ? 'none' : 'lax', // 'none' é necessário se o Frontend e Backend estiverem em domínios diferentes em Prod
+    maxAge: 3600000 * 24, // 24 horas
+    path: '/'
+  });
+}
 }
