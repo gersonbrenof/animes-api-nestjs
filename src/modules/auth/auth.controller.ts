@@ -43,16 +43,17 @@ async getMe(@Req() req) {
   async googleAuth() {}
 
 @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@Req() req, @Res() res: Response) {
-    const authData = await this.authService.validateGoogleUser(req.user);
-    
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-    
-    // 🟢 Em vez de injetar o cookie aqui, mandamos o token na URL para o Front gerenciar
-    return res.redirect(`${frontendUrl}?token=${authData.access_token}`);
-  }
+@UseGuards(AuthGuard('google'))
+async googleAuthRedirect(@Req() req, @Res() res: Response) {
+  const authData = await this.authService.validateGoogleUser(req.user);
+  
+  this.setAuthCookie(res, authData.access_token);
 
+  const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+  
+  // 🟢 Redireciona para a rota do Callback no React enviando o token
+  return res.redirect(`${frontendUrl}/auth/callback?token=${authData.access_token}`);
+}
   // MÉTODO AUXILIAR PRIVADO DE SEGURANÇA
   private setAuthCookie(res: Response, token: string) {
     res.cookie('access_token', token, {
