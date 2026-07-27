@@ -14,26 +14,28 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService, 
   ) {}
-@Get('me')
-@UseGuards(AuthGuard('jwt')) // Garante que o usuário esteja logado
-async getMe(@Req() req) {
-  return req.user; // O Passport injeta o usuário aqui
-}
+
+  @Get('me')
+  @UseGuards(AuthGuard('jwt')) // Garante que o usuário esteja logado
+  async getMe(@Req() req) {
+    return req.user; // O Passport injeta o usuário aqui
+  }
+
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
     return this.authService.register(createUserDto);
   }
 
-@Post('login')
+  @Post('login')
   async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const { access_token, user } = await this.authService.login(loginDto.email, loginDto.password);
     
     // 1. Define o token no cookie (segurança)
     this.setAuthCookie(res, access_token);
     
-    // 2. Retorna o token e o usuário no JSON (para o seu Frontend usar)
+    // 2. Retorna o token e o usuário no JSON
     return { 
-      access_token, // ✅ Adicione o token aqui
+      access_token,
       user 
     };
   }
@@ -42,37 +44,51 @@ async getMe(@Req() req) {
   @UseGuards(AuthGuard('google'))
   async googleAuth() {}
 
-@Get('google/callback')
-@UseGuards(AuthGuard('google'))
-async googleAuthRedirect(@Req() req, @Res() res: Response) {
-  const authData = await this.authService.validateGoogleUser(req.user);
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req, @Res() res: Response) {
+    const authData = await this.authService.validateGoogleUser(req.user);
 
-  this.setAuthCookie(res, authData.access_token);
+    // 1. Grava o cookie HTTP-Only
+    this.setAuthCookie(res, authData.access_token);
 
-  // 🔹 Pega a URL padrão do .env
-  const defaultFrontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    // 2. Busca a URL do frontend configurada no .env (removendo barra no final se houver)
+    const rawFrontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const frontendUrl = rawFrontendUrl.replace(/\/$/, '');
 
-  // 🔹 Detecta de onde o usuário veio
-  const referer = req.headers.referer || req.headers.origin || '';
-  const isLocalhost = referer.includes('localhost') || referer.includes('127.0.0.1');
+    // 3. Redireciona diretamente para o frontend padrão configurado
+    return res.redirect(`${frontendUrl}/auth/callback?token=${authData.access_token}`);
+  }
 
-  // 🔹 Se a chamada veio do ambiente local, redireciona para o localhost; senão, vai para a produção
-  const targetFrontendUrl = isLocalhost ? 'http://localhost:5173' : defaultFrontendUrl;
 
-  // 🟢 Redireciona para o frontend correto enviando o token
-  return res.redirect(`${targetFrontendUrl}/auth/callback?token=${authData.access_token}`);
-}
-
-// MÉTODO AUXILIAR PRIVADO DE SEGURANÇA
-private setAuthCookie(res: Response, token: string) {
+  @Post('logout')
+@ApiOperation({ summary: 'Realiza o logout limpando o cookie de autenticação' })
+async logout(@Res({ passthrough: true }) res: Response) {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  res.cookie('access_token', token, {
-    httpOnly: true, // Protege contra XSS
-    secure: isProduction, // HTTPS em produção
-    sameSite: isProduction ? 'none' : 'lax', // 'none' é necessário se o Frontend e Backend estiverem em domínios diferentes em Prod
-    maxAge: 3600000 * 24, // 24 horas
-    path: '/'
+  // Limpa o cookie removendo a sessão do navegador
+  res.clearCookie('access_token', {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
   });
+
+  return { message: 'Logout realizado com sucesso' };
 }
+
+  // MÉTODO AUXILIAR PRIVADO DE SEGURANÇA
+  private setAuthCookie(res: Response, token: string) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    res.cookie('access_token', token, {
+      httpOnly: true, // Protege contra XSS
+      secure: isProduction, // HTTPS ativado apenas em produção
+      sameSite: isProduction ? 'none' : 'lax', // 'none' para permitir cookies cross-domain no Render
+      maxAge: 3600000 * 24, // 24 horas
+      path: '/'
+    });
+  }
+
+  
 }
