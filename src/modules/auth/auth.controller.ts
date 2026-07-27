@@ -44,21 +44,21 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuth() {}
 
-  @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@Req() req, @Res() res: Response) {
-    const authData = await this.authService.validateGoogleUser(req.user);
+@Get('google/callback')
+@UseGuards(AuthGuard('google'))
+async googleAuthRedirect(@Req() req, @Res() res: Response) {
+  const authData = await this.authService.validateGoogleUser(req.user);
 
-    // 1. Grava o cookie HTTP-Only
-    this.setAuthCookie(res, authData.access_token);
+  // 1. Grava o cookie HTTP-Only
+  this.setAuthCookie(res, authData.access_token);
 
-    // 2. Busca a URL do frontend configurada no .env (removendo barra no final se houver)
-    const rawFrontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-    const frontendUrl = rawFrontendUrl.replace(/\/$/, '');
+  // 2. Busca a URL do frontend configurada no .env (removendo barra no final se houver)
+  const rawFrontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+  const frontendUrl = rawFrontendUrl.replace(/\/$/, '');
 
-    // 3. Redireciona diretamente para o frontend padrão configurado
-    return res.redirect(`${frontendUrl}/auth/callback?token=${authData.access_token}`);
-  }
+  // 3. Redireciona incluindo a tralha (/#/) para o HashRouter do React
+  return res.redirect(`${frontendUrl}/#/auth/callback?token=${authData.access_token}`);
+}
 
 
   @Post('logout')
