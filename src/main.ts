@@ -9,28 +9,44 @@ async function bootstrap() {
   // 🔹 Middleware para ler cookies
   app.use(cookieParser());
 
-  // 🔹 Monta a lista de origens permitidas (Local + Produção)
+  // 🔹 Trata origens do .env (suporta múltiplas URLs separadas por vírgula no FRONTEND_URL)
+  const envOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
+    : [];
+
+  // 🔹 Lista de origens permitidas (Desenvolvimento Local + Produção)
   const allowedOrigins = [
+    // Localhost na porta 3000 (IPv4 e IPv6)
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://[::1]:3000',
+
+    // Localhost na porta 5173 (Vite / React)
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    process.env.FRONTEND_URL, // Ex: https://otaku-shepere.onrender.com
-  ].filter(Boolean) as string[]; // Remove valores undefined/nulos
+    'http://[::1]:5173',
+
+    // Origens de produção vindas das variáveis de ambiente
+    ...envOrigins,
+  ].filter(Boolean);
 
   // 🔹 Configuração flexível de CORS
   app.enableCors({
     origin: (origin, callback) => {
-      // Permite requisições sem origin (mobile, Postman, Swagger) ou origens da lista
+      // Libera chamadas sem 'origin' (Postman, Swagger local, Server-to-Server)
+      // ou se a origem estiver cadastrada na lista
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error(`Origem ${origin} não permitida pelo CORS`));
       }
     },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true, // Essencial para cookies/sessão
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+    credentials: true, // Necessário para suporte a cookies e sessões
   });
 
-  // 🔹 Swagger
+  // 🔹 Configuração do Swagger
   const config = new DocumentBuilder()
     .setTitle('API AnimeSite')
     .setDescription('API para site de animes')
@@ -38,9 +54,8 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.setup('docs', app, () =>
-    SwaggerModule.createDocument(app, config),
-  );
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
